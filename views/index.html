@@ -46,6 +46,15 @@
     .analyze-section button { padding: 5px 12px; }
     #analysis-result { margin-top: 12px; white-space: pre-wrap; font-size: 13px; }
     #analysis-result:empty { display: none; }
+    .tagged-foods { margin-top: 12px; font-size: 13px; }
+    .tagged-foods summary { cursor: pointer; color: #666; }
+    .tagged-foods summary:hover { color: #333; }
+    .tagged-foods-list { margin-top: 8px; padding-left: 20px; }
+    .tagged-foods-list li { margin-bottom: 4px; }
+    .tagged-foods-list .safe-item { color: #2e7d32; }
+    .tagged-foods-list .safe-item a { color: inherit; }
+    .tagged-foods-list .culprit-item { color: #c62828; }
+    .tagged-foods-list .culprit-item a { color: inherit; }
     #chart-container { margin: 15px 0; overflow-x: auto; }
     .matrix { border-collapse: separate; border-spacing: 2px; font-size: 11px; }
     .matrix td, .matrix th { padding: 0; }
@@ -166,6 +175,10 @@
     <button onclick="analyzeEntries()">Find Correlations</button>
     <div id="chart-container"></div>
     <div id="analysis-result"></div>
+    <details class="tagged-foods" id="tagged-foods">
+      <summary>Tagged Foods</summary>
+      <div class="tagged-foods-list" id="tagged-foods-list"></div>
+    </details>
   </div>
 
   <div id="diary"></div>
@@ -307,6 +320,7 @@
           const result = await response.json();
           entry.tag = result.entry.tag;
           renderDiary();
+          renderTaggedFoods();
         } else {
           const error = await response.json();
           alert('Error tagging: ' + error.error);
@@ -625,6 +639,42 @@
       }
     }
     
+    function renderTaggedFoods() {
+      const safeEntries = entries.filter(e => e.tag === 'safe');
+      const culpritEntries = entries.filter(e => e.tag === 'culprit');
+      
+      const container = document.getElementById('tagged-foods');
+      const listDiv = document.getElementById('tagged-foods-list');
+      
+      if (safeEntries.length === 0 && culpritEntries.length === 0) {
+        container.style.display = 'none';
+        return;
+      }
+      
+      container.style.display = 'block';
+      
+      function renderTaggedList(taggedEntries, cssClass) {
+        return taggedEntries.map(entry => {
+          const day = getLocalDate(entry.timestamp);
+          return `<li class="${cssClass}"><a href="#day-${day}">${escapeHtml(entry.text)}</a></li>`;
+        }).join('');
+      }
+      
+      let html = '';
+      if (safeEntries.length > 0) {
+        html += '<strong style="color:#2e7d32">Safe:</strong><ul class="tagged-foods-list">';
+        html += renderTaggedList(safeEntries, 'safe-item');
+        html += '</ul>';
+      }
+      if (culpritEntries.length > 0) {
+        html += '<strong style="color:#c62828">Potential Culprits:</strong><ul class="tagged-foods-list">';
+        html += renderTaggedList(culpritEntries, 'culprit-item');
+        html += '</ul>';
+      }
+      
+      listDiv.innerHTML = html;
+    }
+    
     // Set default date range to last 2 weeks
     const today = new Date().toISOString().split('T')[0];
     const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -633,6 +683,7 @@
     
     renderDiary();
     updateChart();
+    renderTaggedFoods();
     
     // Handle submit button state based on textbox content
     const textInput = document.getElementById('textInput');
