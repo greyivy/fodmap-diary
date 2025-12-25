@@ -6,9 +6,31 @@ const ANALYSIS_MODEL = process.env.GROQ_ANALYSIS_MODEL || 'openai/gpt-oss-120b';
 
 // Extract JSON from response text (browser search doesn't support structured output)
 function extractJSON(text) {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('No JSON found in response');
-  return JSON.parse(match[0]);
+  if (!text) throw new Error('Empty response from LLM');
+  
+  // Try to find JSON by looking for balanced braces
+  let depth = 0;
+  let start = -1;
+  
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (text[i] === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        const jsonStr = text.slice(start, i + 1);
+        try {
+          return JSON.parse(jsonStr);
+        } catch {
+          // Continue looking for valid JSON
+          start = -1;
+        }
+      }
+    }
+  }
+  
+  throw new Error('No valid JSON found in response');
 }
 
 async function callGroq(messages, { useBrowserSearch = false, model = MODEL } = {}) {
@@ -48,9 +70,18 @@ async function callGroq(messages, { useBrowserSearch = false, model = MODEL } = 
   }
 
   const data = await response.json();
+  
+  if (!data.choices?.[0]?.message?.content) {
+    throw new Error('Unexpected response structure from Groq API');
+  }
+  
   const content = data.choices[0].message.content;
   
-  return useBrowserSearch ? extractJSON(content) : JSON.parse(content);
+  try {
+    return useBrowserSearch ? extractJSON(content) : JSON.parse(content);
+  } catch (e) {
+    throw new Error(`Failed to parse LLM response: ${e.message}. Response was: ${content.slice(0, 200)}...`);
+  }
 }
 
 // Classify user input as either a food entry or symptom entry

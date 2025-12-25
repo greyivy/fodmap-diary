@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FODMAP Diary</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
     h1 { margin-bottom: 20px; }
@@ -45,12 +44,54 @@
     .analyze-section button { padding: 5px 12px; }
     #analysis-result { margin-top: 12px; white-space: pre-wrap; font-size: 13px; }
     #analysis-result:empty { display: none; }
-    #chart-container { margin: 15px 0; }
-    #chart-container canvas { max-height: 200px; }
+    #chart-container { margin: 15px 0; overflow-x: auto; }
+    .matrix { border-collapse: separate; border-spacing: 2px; font-size: 11px; }
+    .matrix td, .matrix th { padding: 0; }
+    .matrix-label { text-align: right; padding-right: 8px; color: #666; white-space: nowrap; }
+    .matrix-label.symptom-label { font-weight: 600; color: #333; }
+    .matrix-cell { width: 16px; height: 16px; border-radius: 2px; }
+    .matrix-date { font-size: 9px; color: #888; text-align: center; padding-top: 4px; }
+    .level-0 { background: #f0f0f0; }
+    .level-1 { background: #a8e6cf; }
+    .level-2 { background: #ffd93d; }
+    .level-3 { background: #ff6b6b; }
     .actions-col { display: flex; gap: 4px; padding-top: 2px; }
     .action-btn { background: none; border: none; color: #999; cursor: pointer; font-size: 14px; padding: 2px 4px; }
     .action-btn:hover { color: #666; }
     .delete-btn:hover { color: #e44 !important; }
+    
+    /* Mobile styles */
+    @media (max-width: 600px) {
+      body { padding: 12px; }
+      h1 { font-size: 1.5em; margin-bottom: 15px; }
+      
+      /* Stack entry: time above content */
+      .entry { grid-template-columns: 1fr auto; }
+      .time { grid-column: 1 / -1; padding-bottom: 4px; }
+      
+      /* Form controls wrap */
+      form > div { flex-wrap: wrap; gap: 8px; }
+      textarea { height: 50px; font-size: 16px; }
+      
+      /* Analyze section stacks */
+      .analyze-section { padding: 10px; }
+      .analyze-section > * { display: block; margin-bottom: 8px; }
+      .analyze-section input[type="date"] { margin-right: 5px; margin-bottom: 8px; }
+      
+      /* Matrix scrolls horizontally */
+      #chart-container { margin: 10px -12px; padding: 0 12px; }
+      
+      /* Day ratings wrap */
+      .day-ratings { display: flex; flex-wrap: wrap; gap: 5px; }
+      
+      /* Smaller badges */
+      .risk-badge, .severity-badge, .note-badge { font-size: 10px; padding: 2px 6px; }
+      .fodmaps { display: block; margin-left: 0; margin-top: 4px; }
+      .fodmap { display: inline-block; margin-bottom: 2px; }
+      
+      /* Bigger touch targets for action buttons */
+      .action-btn { font-size: 18px; padding: 4px 8px; }
+    }
   </style>
 </head>
 <body>
@@ -131,26 +172,38 @@
       return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+    
     function renderFodmaps(fodmaps) {
       return Object.entries(fodmaps)
         .filter(([_, level]) => level !== 'none')
-        .map(([name, level]) => `<span class="fodmap fodmap-${level}">${name}: ${level}</span>`)
+        .map(([name, level]) => `<span class="fodmap fodmap-${escapeHtml(level)}">${escapeHtml(name)}: ${escapeHtml(level)}</span>`)
         .join('');
     }
     
     function renderEntry(entry) {
-      const typeClass = entry.type;
+      const typeClass = escapeHtml(entry.type);
       const time = formatTime(entry.timestamp);
+      const safeRisk = escapeHtml(entry.risk);
+      const safeSeverity = escapeHtml(entry.severity);
       
       let badges = '';
       if (entry.type === 'food') {
-        badges = `<span class="risk-badge risk-${entry.risk}">${entry.risk} risk</span>`;
+        badges = `<span class="risk-badge risk-${safeRisk}">${safeRisk} risk</span>`;
         if (entry.fodmaps) {
           const fodmapStr = renderFodmaps(entry.fodmaps);
           if (fodmapStr) badges += `<span class="fodmaps">${fodmapStr}</span>`;
         }
       } else if (entry.type === 'symptom') {
-        badges = `<span class="severity-badge severity-${entry.severity}">${entry.severity}</span>`;
+        badges = `<span class="severity-badge severity-${safeSeverity}">${safeSeverity}</span>`;
       } else if (entry.type === 'note') {
         badges = `<span class="note-badge">NOTE</span>`;
       }
@@ -159,10 +212,10 @@
         <div class="entry ${typeClass}">
           <span class="time">${time}</span>
           <div class="entry-content">
-            <div class="text">${entry.text}</div>
+            <div class="text">${escapeHtml(entry.text)}</div>
             <div class="entry-details">
               <div class="meta">${badges}</div>
-              ${entry.note ? `<div class="llm-note">${entry.note}</div>` : ''}
+              ${entry.note ? `<div class="llm-note">${escapeHtml(entry.note)}</div>` : ''}
             </div>
           </div>
           <div class="actions-col">
@@ -170,7 +223,7 @@
               <input type="hidden" name="key" value="${entry.key}">
               <button type="submit" class="action-btn" title="Duplicate at current time">↻</button>
             </form>
-            <form action="/api/delete" method="POST" style="display:inline">
+            <form action="/api/delete" method="POST" style="display:inline" onsubmit="return confirm('Delete this entry?')">
               <input type="hidden" name="key" value="${entry.key}">
               <button type="submit" class="action-btn delete-btn" title="Delete">×</button>
             </form>
@@ -224,15 +277,9 @@
       `).join('');
     }
     
-    let chartInstance = null;
     const fodmapTypes = ['fructans', 'gos', 'lactose', 'fructose', 'polyols'];
-    const fodmapColors = {
-      fructans: '#8b5cf6',
-      gos: '#06b6d4',
-      lactose: '#f59e0b',
-      fructose: '#ec4899',
-      polyols: '#84cc16'
-    };
+    const rowLabels = ['Symptoms', ...fodmapTypes.map(f => f.charAt(0).toUpperCase() + f.slice(1))];
+    const levelNames = ['none', 'low', 'med', 'high'];
     
     function updateChart() {
       const startDate = document.getElementById('startDate').value;
@@ -241,7 +288,6 @@
       
       if (!startDate || !endDate) {
         container.innerHTML = '';
-        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
         return;
       }
       
@@ -268,61 +314,46 @@
       
       const days = Object.keys(dayData).sort();
       if (days.length === 0) {
-        container.innerHTML = '';
-        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        container.innerHTML = '<div style="color:#888;font-size:12px;">No data in selected range</div>';
         return;
       }
       
-      const labels = days.map(d => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+      // Build matrix table
+      const rows = ['symptom', ...fodmapTypes];
       
-      const datasets = [
-        {
-          label: 'Symptoms',
-          data: days.map(d => dayData[d].symptom),
-          borderColor: '#e74',
-          backgroundColor: 'rgba(238, 119, 68, 0.15)',
-          fill: true,
-          tension: 0.3,
-          borderWidth: 3
-        },
-        ...fodmapTypes.map(f => ({
-          label: f.charAt(0).toUpperCase() + f.slice(1),
-          data: days.map(d => dayData[d][f]),
-          borderColor: fodmapColors[f],
-          backgroundColor: 'transparent',
-          fill: false,
-          tension: 0.3,
-          borderWidth: 1.5,
-          borderDash: [4, 2]
-        }))
-      ];
+      let html = '<table class="matrix">';
       
-      container.innerHTML = '<canvas id="analysisChart"></canvas>';
-      const ctx = document.getElementById('analysisChart').getContext('2d');
-      
-      if (chartInstance) chartInstance.destroy();
-      
-      chartInstance = new Chart(ctx, {
-        type: 'line',
-        data: { labels, datasets },
-        options: {
-          responsive: true,
-          interaction: { mode: 'index', intersect: false },
-          plugins: {
-            legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } }
-          },
-          scales: {
-            y: {
-              min: 0,
-              max: 3,
-              ticks: {
-                stepSize: 1,
-                callback: v => ['None', 'Low', 'Med', 'High'][v]
-              }
-            }
-          }
-        }
+      // Data rows
+      rows.forEach((row, i) => {
+        html += '<tr>';
+        html += `<th class="matrix-label ${i === 0 ? 'symptom-label' : ''}">${rowLabels[i]}</th>`;
+        days.forEach(day => {
+          const level = dayData[day][row];
+          const title = `${rowLabels[i]}: ${levelNames[level]}`;
+          html += `<td><div class="matrix-cell level-${level}" title="${title}"></div></td>`;
+        });
+        html += '</tr>';
       });
+      
+      // Dates row
+      html += '<tr><td></td>';
+      days.forEach(day => {
+        const d = new Date(day + 'T12:00:00');
+        html += `<td class="matrix-date">${d.getDate()}</td>`;
+      });
+      html += '</tr>';
+      
+      html += '</table>';
+      
+      // Legend
+      html += '<div style="margin-top:10px;font-size:10px;color:#666;">';
+      html += '<span style="margin-right:10px;"><span class="matrix-cell level-0" style="display:inline-block;width:10px;height:10px;vertical-align:middle;"></span> None</span>';
+      html += '<span style="margin-right:10px;"><span class="matrix-cell level-1" style="display:inline-block;width:10px;height:10px;vertical-align:middle;"></span> Low</span>';
+      html += '<span style="margin-right:10px;"><span class="matrix-cell level-2" style="display:inline-block;width:10px;height:10px;vertical-align:middle;"></span> Med</span>';
+      html += '<span><span class="matrix-cell level-3" style="display:inline-block;width:10px;height:10px;vertical-align:middle;"></span> High</span>';
+      html += '</div>';
+      
+      container.innerHTML = html;
     }
     
     async function analyzeEntries() {
