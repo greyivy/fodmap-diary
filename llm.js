@@ -124,12 +124,57 @@ Be accurate about FODMAP levels based on Monash University guidelines.`
   return callGroq(messages, { useBrowserSearch: true });
 }
 
+// Format entries for LLM analysis in a readable format
+function formatEntriesForAnalysis(entries) {
+  // Group entries by date
+  const byDate = {};
+  for (const entry of entries) {
+    const d = new Date(entry.timestamp);
+    const dateKey = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (!byDate[dateKey]) byDate[dateKey] = [];
+    byDate[dateKey].push({ ...entry, date: d });
+  }
+  
+  // Format each day
+  const lines = [];
+  for (const [date, dayEntries] of Object.entries(byDate)) {
+    lines.push(`\n${date}`);
+    
+    // Sort entries by time
+    dayEntries.sort((a, b) => a.date - b.date);
+    
+    for (const entry of dayEntries) {
+      const time = entry.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      
+      if (entry.type === 'food') {
+        const factors = entry.factors || { ...entry.fodmaps, ...entry.other };
+        const factorTags = Object.entries(factors || {})
+          .filter(([_, level]) => level && level !== 'none' && level !== 'unknown')
+          .map(([name, level]) => `[${level} ${name}]`)
+          .join(' ');
+        const tagLabel = entry.tag ? ` (${entry.tag})` : '';
+        lines.push(`  ${time}: ${entry.text}${tagLabel} ${factorTags}`);
+      } else if (entry.type === 'symptom') {
+        lines.push(`  ${time}: SYMPTOM - ${entry.text} [${entry.severity}]`);
+      } else if (entry.type === 'note') {
+        lines.push(`  ${time}: NOTE - ${entry.text}`);
+      }
+    }
+  }
+  
+  return lines.join('\n');
+}
+
 // Analyze entries for correlations between foods and symptoms
 export async function analyze(entries) {
+  const formattedEntries = formatEntriesForAnalysis(entries);
+  
   const messages = [
     {
       role: 'system',
       content: `You are a FODMAP diet expert analyzing a food diary. Look for correlations between foods eaten and symptoms reported. Consider timing (symptoms often appear 1-4 hours after eating trigger foods but could take as long as 12-24 hours).
+
+Foods marked as (safe) or (culprit) are user-identified patterns to consider.
 
 Return JSON in this format:
 {
@@ -151,7 +196,7 @@ IMPORTANT: Your response must contain valid JSON matching the format above.`
     },
     {
       role: 'user',
-      content: `Here are the diary entries to analyze:\n\n${JSON.stringify(entries, null, 2)}`
+      content: `Here are the diary entries to analyze:\n${formattedEntries}`
     }
   ];
 

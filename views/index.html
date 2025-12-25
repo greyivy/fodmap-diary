@@ -34,6 +34,12 @@
     .badge-high { background: #f8d7da; color: #721c24; }
     .badge-unknown { background: #e0e0e0; color: #666; }
     .badge-note { background: #cce5ff; color: #004085; }
+    .badge-safe { background: #c8e6c9; color: #2e7d32; }
+    .badge-culprit { background: #ffcdd2; color: #c62828; }
+    .tag-btn { background: none; border: 1px solid #ccc; border-radius: 3px; font-size: 14px; padding: 2px 4px; height: 24px; }
+    .tag-btn:hover { background: #f0f0f0; }
+    .tag-btn.active-safe { background: #c8e6c9; border-color: #2e7d32; color: #2e7d32; }
+    .tag-btn.active-culprit { background: #ffcdd2; border-color: #c62828; color: #c62828; }
     .analyze-section { margin: 20px 0; padding: 10px 15px; background: #f8f8f8; border-radius: 4px; font-size: 14px; }
     .analyze-section label { color: #666; margin-right: 5px; }
     .analyze-section input[type="date"] { margin-right: 10px; padding: 4px; }
@@ -54,8 +60,6 @@
     .level-2 { background: #ffb347; }
     .level-3 { background: #ff6b6b; }
     .actions-col { display: flex; gap: 4px; padding-top: 2px; }
-    .action-btn { background: none; border: none; color: #999; cursor: pointer; font-size: 14px; padding: 2px 4px; height: 24px; }
-    .action-btn:hover { color: #666; }
     .delete-btn:hover { color: #e44 !important; }
     .edit-btn { font-size: 12px; }
     
@@ -97,7 +101,7 @@
       .badge { font-size: 10px; padding: 2px 5px; }
       
       /* Bigger touch targets for action buttons */
-      .action-btn { font-size: 18px; padding: 4px 8px; }
+      .tag-btn { font-size: 18px; padding: 4px 8px; height: 32px; }
       
       /* Edit mode on mobile */
       .edit-dropdowns { gap: 8px; }
@@ -289,6 +293,29 @@
       }
     }
     
+    async function toggleTag(entryKey, tag) {
+      const entry = entries.find(e => e.key === entryKey);
+      
+      try {
+        const response = await fetch('/api/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: entryKey, tag })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          entry.tag = result.entry.tag;
+          renderDiary();
+        } else {
+          const error = await response.json();
+          alert('Error tagging: ' + error.error);
+        }
+      } catch (err) {
+        alert('Error tagging: ' + err.message);
+      }
+    }
+    
     function toggleEdit(entryKey) {
       const entryEl = document.querySelector(`[data-key="${entryKey}"]`);
       const isEditing = entryEl.classList.toggle('editing');
@@ -320,15 +347,26 @@
       const time = formatTime(entry.timestamp);
       const safeSeverity = escapeHtml(entry.severity || '');
       const canEdit = entry.type === 'food' || entry.type === 'symptom';
+      const isFood = entry.type === 'food';
       
       let badges = '';
       if (entry.type === 'food') {
         badges = renderFactors(getFactors(entry));
+        if (entry.tag === 'safe') {
+          badges += ` <span class="badge badge-safe">Safe</span>`;
+        } else if (entry.tag === 'culprit') {
+          badges += ` <span class="badge badge-culprit">Culprit</span>`;
+        }
       } else if (entry.type === 'symptom') {
         badges = `<span class="badge badge-${safeSeverity}">Symptoms</span>`;
       } else if (entry.type === 'note') {
         badges = `<span class="badge badge-note">Note</span>`;
       }
+      
+      const tagButtons = isFood ? `
+        <button type="button" class="tag-btn ${entry.tag === 'safe' ? 'active-safe' : ''}" onclick="toggleTag('${entry.key}', 'safe')" title="Mark as safe">✓</button>
+        <button type="button" class="tag-btn ${entry.tag === 'culprit' ? 'active-culprit' : ''}" onclick="toggleTag('${entry.key}', 'culprit')" title="Mark as culprit">✗</button>
+      ` : '';
       
       return `
         <div class="entry ${typeClass}" data-key="${entry.key}">
@@ -342,14 +380,15 @@
             </div>
           </div>
           <div class="actions-col">
+            ${tagButtons}
             <form action="/api/duplicate" method="POST" style="display:inline">
               <input type="hidden" name="key" value="${entry.key}">
-              <button type="submit" class="action-btn" title="Duplicate at current time">↻</button>
+              <button type="submit" class="tag-btn" title="Duplicate at current time">↻</button>
             </form>
-            ${canEdit ? `<button type="button" class="action-btn edit-btn" onclick="toggleEdit('${entry.key}')" title="Edit">✎</button>` : ''}
+            ${canEdit ? `<button type="button" class="tag-btn edit-btn" onclick="toggleEdit('${entry.key}')" title="Edit">✎</button>` : ''}
             <form action="/api/delete" method="POST" style="display:inline" onsubmit="return confirm('Delete this entry?')">
               <input type="hidden" name="key" value="${entry.key}">
-              <button type="submit" class="action-btn delete-btn" title="Delete">×</button>
+              <button type="submit" class="tag-btn delete-btn" title="Delete">×</button>
             </form>
           </div>
         </div>

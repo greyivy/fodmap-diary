@@ -103,9 +103,9 @@ app.post('/api/duplicate', async (req, res) => {
   }
 });
 
-// Update entry (factors or severity)
+// Update entry (factors, severity, or tag)
 app.post('/api/update', async (req, res) => {
-  const { key, factors, severity } = req.body;
+  const { key, factors, severity, tag } = req.body;
   
   try {
     const entry = await db.get(key);
@@ -119,9 +119,13 @@ app.post('/api/update', async (req, res) => {
     if (severity) {
       entry.severity = severity;
     }
+    if (tag !== undefined) {
+      // Toggle tag: if same tag, remove it; otherwise set it
+      entry.tag = entry.tag === tag ? null : tag;
+    }
     
     await db.put(key, entry);
-    res.json({ success: true });
+    res.json({ success: true, entry });
   } catch (error) {
     console.error('Error updating entry:', error);
     res.status(500).json({ error: error.message });
