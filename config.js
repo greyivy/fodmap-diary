@@ -9,6 +9,7 @@ export const FACTORS = [
   { id: 'gluten', name: 'Gluten', category: 'other' },
   { id: 'soy', name: 'Soy', category: 'other' },
   { id: 'nightshades', name: 'Nightshades', category: 'other' },
+  { id: 'fibre', name: 'Fibre', category: 'other' },
 ];
 
 export const FACTOR_IDS = FACTORS.map(f => f.id);
