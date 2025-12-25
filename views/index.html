@@ -36,7 +36,7 @@
     .badge-note { background: #cce5ff; color: #004085; }
     .badge-safe { background: #c8e6c9; color: #2e7d32; }
     .badge-culprit { background: #ffcdd2; color: #c62828; }
-    .tag-btn { background: none; border: 1px solid #ccc; border-radius: 3px; font-size: 14px; padding: 2px 4px; height: 24px; }
+    .tag-btn { background: none; color: #333; border: 1px solid #ccc; border-radius: 3px; font-size: 14px; padding: 2px 4px; height: 24px; }
     .tag-btn:hover { background: #f0f0f0; }
     .tag-btn.active-safe { background: #c8e6c9; border-color: #2e7d32; color: #2e7d32; }
     .tag-btn.active-culprit { background: #ffcdd2; border-color: #c62828; color: #c62828; }
@@ -364,8 +364,8 @@
       }
       
       const tagButtons = isFood ? `
-        <button type="button" class="tag-btn ${entry.tag === 'safe' ? 'active-safe' : ''}" onclick="toggleTag('${entry.key}', 'safe')" title="Mark as safe">✓</button>
-        <button type="button" class="tag-btn ${entry.tag === 'culprit' ? 'active-culprit' : ''}" onclick="toggleTag('${entry.key}', 'culprit')" title="Mark as culprit">✗</button>
+        <button type="button" class="tag-btn ${entry.tag === 'safe' ? 'active-safe' : ''}" onclick="toggleTag('${entry.key}', 'safe')" title="Mark as safe">👍</button>
+        <button type="button" class="tag-btn ${entry.tag === 'culprit' ? 'active-culprit' : ''}" onclick="toggleTag('${entry.key}', 'culprit')" title="Mark as culprit">👎</button>
       ` : '';
       
       return `
@@ -388,7 +388,7 @@
             ${canEdit ? `<button type="button" class="tag-btn edit-btn" onclick="toggleEdit('${entry.key}')" title="Edit">✎</button>` : ''}
             <form action="/api/delete" method="POST" style="display:inline" onsubmit="return confirm('Delete this entry?')">
               <input type="hidden" name="key" value="${entry.key}">
-              <button type="submit" class="tag-btn delete-btn" title="Delete">×</button>
+              <button type="submit" class="tag-btn delete-btn" title="Delete">✗</button>
             </form>
           </div>
         </div>
