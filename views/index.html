@@ -7,8 +7,7 @@
   <style>
     body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
     h1 { margin-bottom: 20px; }
-    form { margin-bottom: 30px; }
-    textarea { width: 100%; height: 60px; margin-bottom: 10px; font-size: 16px; }
+    #textInput { width: 100%; height: 60px; margin-bottom: 10px; font-family: inherit; font-size: inherit; box-sizing: border-box; }
     button { padding: 8px 16px; font-size: 14px; cursor: pointer; }
     .day { margin-bottom: 30px; }
     .day h2 { border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 5px; }
@@ -25,19 +24,14 @@
     .food .entry-content { border-left: 3px solid #4a9; padding-left: 10px; }
     .symptom .entry-content { border-left: 3px solid #e74; padding-left: 10px; }
     .note .entry-content { border-left: 3px solid #88f; padding-left: 10px; }
-    .risk-badge, .severity-badge, .note-badge { 
-      display: inline-block; padding: 2px 8px; border-radius: 3px; 
-      font-weight: 600; font-size: 12px; text-transform: uppercase; 
+    .badge {
+      display: inline-block; padding: 2px 6px; border-radius: 3px;
+      font-weight: 500; font-size: 11px; margin-right: 4px; margin-bottom: 2px;
     }
-    .risk-low, .severity-low { background: #d4edda; color: #155724; }
-    .risk-medium, .severity-medium { background: #fff3cd; color: #856404; }
-    .risk-high, .severity-high { background: #f8d7da; color: #721c24; }
-    .note-badge { background: #88f; color: #fff; }
-    .fodmaps { display: inline; margin-left: 10px; }
-    .fodmap { font-size: 12px; margin-right: 8px; }
-    .fodmap-low { color: #28a745; }
-    .fodmap-medium { color: #d68910; }
-    .fodmap-high { color: #c0392b; }
+    .badge-low { background: #d4edda; color: #155724; }
+    .badge-medium { background: #fff3cd; color: #856404; }
+    .badge-high { background: #f8d7da; color: #721c24; }
+    .badge-note { background: #cce5ff; color: #004085; }
     .analyze-section { margin: 20px 0; padding: 10px 15px; background: #f8f8f8; border-radius: 4px; font-size: 14px; }
     .analyze-section label { color: #666; margin-right: 5px; }
     .analyze-section input[type="date"] { margin-right: 10px; padding: 4px; }
@@ -47,18 +41,32 @@
     #chart-container { margin: 15px 0; overflow-x: auto; }
     .matrix { border-collapse: separate; border-spacing: 2px; font-size: 11px; }
     .matrix td, .matrix th { padding: 0; }
-    .matrix-label { text-align: right; padding-right: 8px; color: #666; white-space: nowrap; }
+    .matrix-label { text-align: right; padding-right: 8px !important; color: #666; white-space: nowrap; }
     .matrix-label.symptom-label { font-weight: 600; color: #333; }
     .matrix-cell { width: 16px; height: 16px; border-radius: 2px; }
-    .matrix-date { font-size: 9px; color: #888; text-align: center; padding-top: 4px; }
+    .matrix-date { font-size: 9px; text-align: center; padding-top: 4px; }
+    .matrix-date a { color: #888; text-decoration: none; }
+    .matrix-date a:hover { color: #333; text-decoration: underline; }
     .level-0 { background: #f0f0f0; }
     .level-1 { background: #a8e6cf; }
     .level-2 { background: #ffd93d; }
     .level-3 { background: #ff6b6b; }
     .actions-col { display: flex; gap: 4px; padding-top: 2px; }
-    .action-btn { background: none; border: none; color: #999; cursor: pointer; font-size: 14px; padding: 2px 4px; }
+    .action-btn { background: none; border: none; color: #999; cursor: pointer; font-size: 14px; padding: 2px 4px; height: 24px; }
     .action-btn:hover { color: #666; }
     .delete-btn:hover { color: #e44 !important; }
+    .edit-btn { font-size: 12px; }
+    
+    /* Edit mode */
+    .entry.editing .view-mode { display: none; }
+    .entry:not(.editing) .edit-form { display: none; }
+    .edit-form form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .edit-dropdowns { display: flex; flex-wrap: wrap; gap: 6px; }
+    .factor-edit { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+    .factor-label { font-weight: 500; color: #666; min-width: 60px; }
+    .factor-select { font-size: 11px; padding: 2px 4px; border: 1px solid #ccc; border-radius: 3px; }
+    .save-btn { background: #4a9; color: white; border: none; padding: 4px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+    .save-btn:hover { background: #3a8; }
     
     /* Mobile styles */
     @media (max-width: 600px) {
@@ -71,11 +79,10 @@
       
       /* Form controls wrap */
       form > div { flex-wrap: wrap; gap: 8px; }
-      textarea { height: 50px; font-size: 16px; }
+      #textInput { height: 50px; }
       
       /* Analyze section stacks */
       .analyze-section { padding: 10px; }
-      .analyze-section > * { display: block; margin-bottom: 8px; }
       .analyze-section input[type="date"] { margin-right: 5px; margin-bottom: 8px; }
       
       /* Matrix scrolls horizontally */
@@ -85,12 +92,17 @@
       .day-ratings { display: flex; flex-wrap: wrap; gap: 5px; }
       
       /* Smaller badges */
-      .risk-badge, .severity-badge, .note-badge { font-size: 10px; padding: 2px 6px; }
-      .fodmaps { display: block; margin-left: 0; margin-top: 4px; }
-      .fodmap { display: inline-block; margin-bottom: 2px; }
+      .badge { font-size: 10px; padding: 2px 5px; }
       
       /* Bigger touch targets for action buttons */
       .action-btn { font-size: 18px; padding: 4px 8px; }
+      
+      /* Edit mode on mobile */
+      .edit-dropdowns { gap: 8px; }
+      .factor-edit { flex-direction: column; align-items: flex-start; gap: 2px; }
+      .factor-label { min-width: auto; }
+      .factor-select { font-size: 14px; padding: 4px 8px; }
+      .save-btn { padding: 8px 16px; font-size: 14px; }
     }
   </style>
 </head>
@@ -98,12 +110,12 @@
   <h1>FODMAP Diary</h1>
   
   <form id="addForm" action="/api/add" method="POST">
-    <textarea id="textInput" name="text" placeholder="Enter what you ate or how you're feeling... (Enter to submit)"></textarea>
+    <input type="text" id="textInput" name="text" placeholder="Enter what you ate or how you're feeling..." />
     <div style="margin-bottom: 10px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
       <label><input type="checkbox" name="isNote" value="1"> Add as note</label>
       <label><input type="checkbox" id="overrideTime" name="overrideTime" value="1" onchange="toggleTimeInput()"> Override time</label>
       <input type="datetime-local" id="customTime" name="customTime" style="display: none;">
-      <button type="submit" id="submitBtn">Add Entry</button>
+      <button type="submit" id="submitBtn" disabled>Add Entry</button>
     </div>
   </form>
   
@@ -154,6 +166,10 @@
 
   <script>
     const entries = {{ENTRIES_JSON}};
+    const FACTORS = {{FACTORS_JSON}};
+    const FACTOR_IDS = {{FACTOR_IDS_JSON}};
+    const LEVELS = {{LEVELS_JSON}};
+    const SEVERITY_LEVELS = ['low', 'medium', 'high'];
     
     // Group entries by local date
     function getLocalDate(timestamp) {
@@ -182,39 +198,144 @@
         .replace(/'/g, '&#39;');
     }
     
-    function renderFodmaps(fodmaps) {
-      return Object.entries(fodmaps)
-        .filter(([_, level]) => level !== 'none')
-        .map(([name, level]) => `<span class="fodmap fodmap-${escapeHtml(level)}">${escapeHtml(name)}: ${escapeHtml(level)}</span>`)
-        .join('');
+    function capitalize(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+    
+    function renderFactors(factors) {
+      if (!factors) return '';
+      return Object.entries(factors)
+        .filter(([_, level]) => level && level !== 'none' && level !== 'unknown')
+        .map(([id, level]) => {
+          const factor = FACTORS.find(f => f.id === id);
+          const displayName = factor ? factor.name : capitalize(escapeHtml(id));
+          const safeLevel = escapeHtml(level);
+          return `<span class="badge badge-${safeLevel}">${displayName}</span>`;
+        })
+        .join(' ');
+    }
+    
+    // For backwards compatibility with old entries
+    function getFactors(entry) {
+      if (entry.factors) return entry.factors;
+      // Merge old fodmaps and other into factors
+      return { ...entry.fodmaps, ...entry.other };
+    }
+    
+    function renderFactorDropdowns(factors, entryKey) {
+      return FACTORS.map(f => {
+        const currentLevel = factors?.[f.id] || 'none';
+        const options = LEVELS.map(level => 
+          `<option value="${level}" ${level === currentLevel ? 'selected' : ''}>${level}</option>`
+        ).join('');
+        return `
+          <label class="factor-edit">
+            <span class="factor-label">${f.name}</span>
+            <select name="${f.id}" class="factor-select">${options}</select>
+          </label>
+        `;
+      }).join('');
+    }
+    
+    function renderSeverityDropdown(currentSeverity) {
+      const options = SEVERITY_LEVELS.map(level => 
+        `<option value="${level}" ${level === currentSeverity ? 'selected' : ''}>${level}</option>`
+      ).join('');
+      return `
+        <label class="factor-edit">
+          <span class="factor-label">Severity</span>
+          <select name="severity" class="factor-select">${options}</select>
+        </label>
+      `;
+    }
+    
+    async function saveEntry(entryKey, form) {
+      const formData = new FormData(form);
+      const entry = entries.find(e => e.key === entryKey);
+      
+      let body = { key: entryKey };
+      
+      if (entry.type === 'food') {
+        const factors = {};
+        FACTOR_IDS.forEach(id => {
+          factors[id] = formData.get(id);
+        });
+        body.factors = factors;
+      } else if (entry.type === 'symptom') {
+        body.severity = formData.get('severity');
+      }
+      
+      try {
+        const response = await fetch('/api/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        
+        if (response.ok) {
+          // Update local entry data
+          if (body.factors) entry.factors = body.factors;
+          if (body.severity) entry.severity = body.severity;
+          renderDiary();
+          updateChart();
+        } else {
+          const error = await response.json();
+          alert('Error saving: ' + error.error);
+        }
+      } catch (err) {
+        alert('Error saving: ' + err.message);
+      }
+    }
+    
+    function toggleEdit(entryKey) {
+      const entryEl = document.querySelector(`[data-key="${entryKey}"]`);
+      const isEditing = entryEl.classList.toggle('editing');
+      
+      if (isEditing) {
+        const entry = entries.find(e => e.key === entryKey);
+        const editContainer = entryEl.querySelector('.edit-form');
+        
+        if (entry.type === 'food') {
+          editContainer.innerHTML = `
+            <form onsubmit="event.preventDefault(); saveEntry('${entryKey}', this)">
+              <div class="edit-dropdowns">${renderFactorDropdowns(getFactors(entry), entryKey)}</div>
+              <button type="submit" class="save-btn">Save</button>
+            </form>
+          `;
+        } else if (entry.type === 'symptom') {
+          editContainer.innerHTML = `
+            <form onsubmit="event.preventDefault(); saveEntry('${entryKey}', this)">
+              <div class="edit-dropdowns">${renderSeverityDropdown(entry.severity)}</div>
+              <button type="submit" class="save-btn">Save</button>
+            </form>
+          `;
+        }
+      }
     }
     
     function renderEntry(entry) {
       const typeClass = escapeHtml(entry.type);
       const time = formatTime(entry.timestamp);
-      const safeRisk = escapeHtml(entry.risk);
-      const safeSeverity = escapeHtml(entry.severity);
+      const safeSeverity = escapeHtml(entry.severity || '');
+      const canEdit = entry.type === 'food' || entry.type === 'symptom';
       
       let badges = '';
       if (entry.type === 'food') {
-        badges = `<span class="risk-badge risk-${safeRisk}">${safeRisk} risk</span>`;
-        if (entry.fodmaps) {
-          const fodmapStr = renderFodmaps(entry.fodmaps);
-          if (fodmapStr) badges += `<span class="fodmaps">${fodmapStr}</span>`;
-        }
+        badges = renderFactors(getFactors(entry));
       } else if (entry.type === 'symptom') {
-        badges = `<span class="severity-badge severity-${safeSeverity}">${safeSeverity}</span>`;
+        badges = `<span class="badge badge-${safeSeverity}">Symptoms</span>`;
       } else if (entry.type === 'note') {
-        badges = `<span class="note-badge">NOTE</span>`;
+        badges = `<span class="badge badge-note">Note</span>`;
       }
       
       return `
-        <div class="entry ${typeClass}">
+        <div class="entry ${typeClass}" data-key="${entry.key}">
           <span class="time">${time}</span>
           <div class="entry-content">
             <div class="text">${escapeHtml(entry.text)}</div>
             <div class="entry-details">
-              <div class="meta">${badges}</div>
+              <div class="meta view-mode">${badges}</div>
+              <div class="edit-form"></div>
               ${entry.note ? `<div class="llm-note">${escapeHtml(entry.note)}</div>` : ''}
             </div>
           </div>
@@ -223,6 +344,7 @@
               <input type="hidden" name="key" value="${entry.key}">
               <button type="submit" class="action-btn" title="Duplicate at current time">↻</button>
             </form>
+            ${canEdit ? `<button type="button" class="action-btn edit-btn" onclick="toggleEdit('${entry.key}')" title="Edit">✎</button>` : ''}
             <form action="/api/delete" method="POST" style="display:inline" onsubmit="return confirm('Delete this entry?')">
               <input type="hidden" name="key" value="${entry.key}">
               <button type="submit" class="action-btn delete-btn" title="Delete">×</button>
@@ -232,7 +354,7 @@
       `;
     }
     
-    const levelOrder = { none: 0, low: 1, medium: 2, high: 3 };
+    const levelOrder = { none: 0, unknown: 0, low: 1, medium: 2, high: 3 };
     
     function getWorstLevel(entries, type, field) {
       const levels = entries
@@ -244,19 +366,49 @@
       );
     }
     
-    function renderDayRatings(entries) {
-      const worstRisk = getWorstLevel(entries, 'food', 'risk');
-      const worstSeverity = getWorstLevel(entries, 'symptom', 'severity');
+    function getWorstFactorLevel(entries, factorName) {
+      const levels = entries
+        .filter(e => e.type === 'food')
+        .map(e => {
+          const factors = getFactors(e);
+          return factors?.[factorName];
+        })
+        .filter(level => level && level !== 'none' && level !== 'unknown');
+      if (levels.length === 0) return null;
+      return levels.reduce((worst, level) => 
+        levelOrder[level] > levelOrder[worst] ? level : worst
+      );
+    }
+    
+    function renderDayRatings(dayEntries) {
+      const worstSeverity = getWorstLevel(dayEntries, 'symptom', 'severity');
+      
+      // Get worst level for each factor
+      const factorLevels = {};
+      FACTOR_IDS.forEach(f => {
+        const worst = getWorstFactorLevel(dayEntries, f);
+        if (worst) factorLevels[f] = worst;
+      });
+      
+      const hasFactors = Object.keys(factorLevels).length > 0;
+      if (!hasFactors && !worstSeverity) return '';
       
       let html = '<div class="day-ratings">';
-      if (worstRisk) {
-        html += `<span class="day-rating">Food: <span class="risk-badge risk-${worstRisk}">${worstRisk}</span></span>`;
-      }
+      
+      // Show factors
+      Object.entries(factorLevels).forEach(([id, level]) => {
+        const factor = FACTORS.find(f => f.id === id);
+        const displayName = factor ? factor.name : capitalize(id);
+        html += `<span class="badge badge-${level}">${displayName}</span> `;
+      });
+      
+      // Show symptoms
       if (worstSeverity) {
-        html += `<span class="day-rating">Symptoms: <span class="severity-badge severity-${worstSeverity}">${worstSeverity}</span></span>`;
+        html += `<span class="badge badge-${worstSeverity}">Symptoms</span>`;
       }
+      
       html += '</div>';
-      return (worstRisk || worstSeverity) ? html : '';
+      return html;
     }
     
     function renderDiary() {
@@ -269,7 +421,7 @@
       }
       
       diary.innerHTML = days.map(day => `
-        <div class="day">
+        <div class="day" id="day-${day}">
           <h2>${new Date(day + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
           ${renderDayRatings(entriesByDay[day])}
           ${entriesByDay[day].map(renderEntry).join('')}
@@ -277,8 +429,8 @@
       `).join('');
     }
     
-    const fodmapTypes = ['fructans', 'gos', 'lactose', 'fructose', 'polyols'];
-    const rowLabels = ['Symptoms', ...fodmapTypes.map(f => f.charAt(0).toUpperCase() + f.slice(1))];
+    // Derive types from central config
+    const rowLabels = ['Symptoms', ...FACTORS.map(f => f.name)];
     const levelNames = ['none', 'low', 'med', 'high'];
     
     function updateChart() {
@@ -292,19 +444,26 @@
       }
       
       // Get days in range with their worst levels
-      const emptyDay = () => ({ symptom: 0, fructans: 0, gos: 0, lactose: 0, fructose: 0, polyols: 0 });
+      const emptyDay = () => {
+        const day = { symptom: 0 };
+        FACTOR_IDS.forEach(f => day[f] = 0);
+        return day;
+      };
       const dayData = {};
       
       entries.forEach(entry => {
         const day = getLocalDate(entry.timestamp);
         if (day >= startDate && day <= endDate) {
           if (!dayData[day]) dayData[day] = emptyDay();
-          if (entry.type === 'food' && entry.fodmaps) {
-            fodmapTypes.forEach(f => {
-              if (entry.fodmaps[f]) {
-                dayData[day][f] = Math.max(dayData[day][f], levelOrder[entry.fodmaps[f]] || 0);
-              }
-            });
+          if (entry.type === 'food') {
+            const factors = getFactors(entry);
+            if (factors) {
+              FACTOR_IDS.forEach(f => {
+                if (factors[f]) {
+                  dayData[day][f] = Math.max(dayData[day][f], levelOrder[factors[f]] || 0);
+                }
+              });
+            }
           }
           if (entry.type === 'symptom' && entry.severity) {
             dayData[day].symptom = Math.max(dayData[day].symptom, levelOrder[entry.severity] || 0);
@@ -319,27 +478,33 @@
       }
       
       // Build matrix table
-      const rows = ['symptom', ...fodmapTypes];
+      const rows = ['symptom', ...FACTOR_IDS];
       
       let html = '<table class="matrix">';
       
       // Data rows
       rows.forEach((row, i) => {
         html += '<tr>';
-        html += `<th class="matrix-label ${i === 0 ? 'symptom-label' : ''}">${rowLabels[i]}</th>`;
+        html += `<th class="matrix-label">${rowLabels[i]}</th>`;
         days.forEach(day => {
           const level = dayData[day][row];
           const title = `${rowLabels[i]}: ${levelNames[level]}`;
           html += `<td><div class="matrix-cell level-${level}" title="${title}"></div></td>`;
         });
         html += '</tr>';
+        if (i === 0) {
+          html += '<tr>';
+          html += '<td style="height:8px;"></td>';
+          html += '</tr>';
+        }
       });
       
       // Dates row
       html += '<tr><td></td>';
       days.forEach(day => {
         const d = new Date(day + 'T12:00:00');
-        html += `<td class="matrix-date">${d.getDate()}</td>`;
+        const label = `${d.getDate()}`;
+        html += `<td class="matrix-date"><a href="#day-${day}">${label}</a></td>`;
       });
       html += '</tr>';
       
@@ -427,6 +592,14 @@
     
     renderDiary();
     updateChart();
+    
+    // Handle submit button state based on textbox content
+    const textInput = document.getElementById('textInput');
+    const submitBtn = document.getElementById('submitBtn');
+    textInput.addEventListener('input', () => {
+      submitBtn.disabled = !textInput.value.trim();
+    });
+    textInput.focus();
   </script>
 </body>
 </html>

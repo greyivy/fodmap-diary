@@ -1,8 +1,15 @@
 // Groq API wrapper for FODMAP classification and analysis
 
+import { FACTOR_IDS, LEVELS } from './config.js';
+
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const ANALYSIS_MODEL = process.env.GROQ_ANALYSIS_MODEL || 'openai/gpt-oss-120b';
+
+// Build factors schema for LLM prompt
+const FACTORS_SCHEMA = FACTOR_IDS
+  .map(id => `"${id}":"${LEVELS.join('|')}"`)
+  .join(',');
 
 // Extract JSON from response text (browser search doesn't support structured output)
 function extractJSON(text) {
@@ -98,12 +105,14 @@ Use browser_search to:
 After your analysis, respond with ONLY a JSON object in your message (not as a tool call). Do not wrap it in markdown code blocks.
 
 For FOOD entries:
-{"type":"food","fodmaps":{"fructans":"none|low|medium|high","gos":"none|low|medium|high","lactose":"none|low|medium|high","fructose":"none|low|medium|high","polyols":"none|low|medium|high"},"risk":"low|medium|high","note":"Brief note about FODMAP content or portion guidance"}
+{"type":"food","factors":{${FACTORS_SCHEMA}},"note":"Brief note about content or portion guidance"}
+
+Use "unknown" for a category if you cannot determine the level with reasonable confidence.
 
 For SYMPTOM entries:
 {"type":"symptom","severity":"low|medium|high","note":"Brief note about the symptom"}
 
-Be accurate about FODMAP levels based on Monash University guidelines. If FODMAP levels are unclear, mention that in your note.`
+Be accurate about FODMAP levels based on Monash University guidelines.`
     },
     {
       role: 'user',

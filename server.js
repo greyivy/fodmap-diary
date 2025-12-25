@@ -3,6 +3,7 @@ import express from 'express';
 import { Level } from 'level';
 import { readFileSync } from 'fs';
 import { classify, analyze } from './llm.js';
+import { FACTORS, FACTOR_IDS, LEVELS } from './config.js';
 
 const app = express();
 const db = new Level('./data', { valueEncoding: 'json' });
@@ -24,6 +25,9 @@ app.get('/', async (req, res) => {
   // Read and render template
   let html = readFileSync('./views/index.html', 'utf-8');
   html = html.replace('{{ENTRIES_JSON}}', JSON.stringify(entries));
+  html = html.replace('{{FACTORS_JSON}}', JSON.stringify(FACTORS));
+  html = html.replace('{{FACTOR_IDS_JSON}}', JSON.stringify(FACTOR_IDS));
+  html = html.replace('{{LEVELS_JSON}}', JSON.stringify(LEVELS));
   
   res.send(html);
 });
@@ -96,6 +100,31 @@ app.post('/api/duplicate', async (req, res) => {
   } catch (error) {
     console.error('Error duplicating entry:', error);
     res.status(500).send(`Error: ${error.message}. <a href="/">Go back</a>`);
+  }
+});
+
+// Update entry (factors or severity)
+app.post('/api/update', async (req, res) => {
+  const { key, factors, severity } = req.body;
+  
+  try {
+    const entry = await db.get(key);
+    
+    if (factors) {
+      entry.factors = factors;
+      // Clear old format if present
+      delete entry.fodmaps;
+      delete entry.other;
+    }
+    if (severity) {
+      entry.severity = severity;
+    }
+    
+    await db.put(key, entry);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating entry:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
