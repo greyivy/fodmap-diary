@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FODMAP Diary</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    h1 { margin-bottom: 20px; }
+    form { margin-bottom: 30px; }
+    textarea { width: 100%; height: 60px; margin-bottom: 10px; font-size: 16px; }
+    button { padding: 8px 16px; font-size: 14px; cursor: pointer; }
+    .day { margin-bottom: 30px; }
+    .day h2 { border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 5px; }
+    .day-ratings { font-size: 14px; margin-bottom: 15px; }
+    .day-rating { margin-right: 15px; }
+    .entry { margin: 12px 0; display: grid; grid-template-columns: 70px 1fr auto; gap: 0 10px; }
+    .time { color: #888; font-size: 13px; font-family: monospace; padding-top: 2px; }
+    .entry-content { min-width: 0; }
+    .entry-line { display: flex; align-items: baseline; gap: 8px; }
+    .text { font-size: 15px; }
+    .entry-details { margin-top: 4px; padding-left: 0; }
+    .meta { font-size: 13px; color: #444; margin-bottom: 4px; }
+    .llm-note { font-style: italic; color: #666; font-size: 13px; }
+    .food .entry-content { border-left: 3px solid #4a9; padding-left: 10px; }
+    .symptom .entry-content { border-left: 3px solid #e74; padding-left: 10px; }
+    .note .entry-content { border-left: 3px solid #88f; padding-left: 10px; }
+    .risk-badge, .severity-badge, .note-badge { 
+      display: inline-block; padding: 2px 8px; border-radius: 3px; 
+      font-weight: 600; font-size: 12px; text-transform: uppercase; 
+    }
+    .risk-low, .severity-low { background: #d4edda; color: #155724; }
+    .risk-medium, .severity-medium { background: #fff3cd; color: #856404; }
+    .risk-high, .severity-high { background: #f8d7da; color: #721c24; }
+    .note-badge { background: #88f; color: #fff; }
+    .fodmaps { display: inline; margin-left: 10px; }
+    .fodmap { font-size: 12px; margin-right: 8px; }
+    .fodmap-low { color: #28a745; }
+    .fodmap-medium { color: #d68910; }
+    .fodmap-high { color: #c0392b; }
+    .analyze-section { margin: 20px 0; padding: 10px 15px; background: #f8f8f8; border-radius: 4px; font-size: 14px; }
+    .analyze-section label { color: #666; margin-right: 5px; }
+    .analyze-section input[type="date"] { margin-right: 10px; padding: 4px; }
+    .analyze-section button { padding: 5px 12px; }
+    #analysis-result { margin-top: 12px; white-space: pre-wrap; font-size: 13px; }
+    #analysis-result:empty { display: none; }
+    #chart-container { margin: 15px 0; }
+    #chart-container canvas { max-height: 200px; }
+    .actions-col { display: flex; gap: 4px; padding-top: 2px; }
+    .action-btn { background: none; border: none; color: #999; cursor: pointer; font-size: 14px; padding: 2px 4px; }
+    .action-btn:hover { color: #666; }
+    .delete-btn:hover { color: #e44 !important; }
+  </style>
+</head>
+<body>
+  <h1>FODMAP Diary</h1>
+  
+  <form id="addForm" action="/api/add" method="POST">
+    <textarea id="textInput" name="text" placeholder="Enter what you ate or how you're feeling... (Enter to submit)"></textarea>
+    <div style="margin-bottom: 10px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+      <label><input type="checkbox" name="isNote" value="1"> Add as note</label>
+      <label><input type="checkbox" id="overrideTime" name="overrideTime" value="1" onchange="toggleTimeInput()"> Override time</label>
+      <input type="datetime-local" id="customTime" name="customTime" style="display: none;">
+      <button type="submit" id="submitBtn">Add Entry</button>
+    </div>
+  </form>
+  
+  <script>
+    function getLocalDateTimeString(date = new Date()) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+    
+    function toggleTimeInput() {
+      const checkbox = document.getElementById('overrideTime');
+      const input = document.getElementById('customTime');
+      input.style.display = checkbox.checked ? 'inline' : 'none';
+      if (checkbox.checked && !input.value) {
+        input.value = getLocalDateTimeString();
+      }
+    }
+    
+    // Enter key submits form
+    document.getElementById('textInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('addForm').requestSubmit();
+      }
+    });
+    
+    // Prevent double submission
+    document.getElementById('addForm').addEventListener('submit', function() {
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Adding...';
+    });
+  </script>
+
+  <div class="analyze-section">
+    <label>Analyze:</label>
+    <input type="date" id="startDate" onchange="updateChart()"> to <input type="date" id="endDate" onchange="updateChart()">
+    <button onclick="analyzeEntries()">Find Correlations</button>
+    <div id="chart-container"></div>
+    <div id="analysis-result"></div>
+  </div>
+
+  <div id="diary"></div>
+
+  <script>
+    const entries = {{ENTRIES_JSON}};
+    
+    // Group entries by local date
+    function getLocalDate(timestamp) {
+      const d = new Date(timestamp);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    
+    const entriesByDay = {};
+    for (const entry of entries) {
+      const day = getLocalDate(entry.timestamp);
+      if (!entriesByDay[day]) entriesByDay[day] = [];
+      entriesByDay[day].push(entry);
+    }
+    
+    function formatTime(timestamp) {
+      return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    function renderFodmaps(fodmaps) {
+      return Object.entries(fodmaps)
+        .filter(([_, level]) => level !== 'none')
+        .map(([name, level]) => `<span class="fodmap fodmap-${level}">${name}: ${level}</span>`)
+        .join('');
+    }
+    
+    function renderEntry(entry) {
+      const typeClass = entry.type;
+      const time = formatTime(entry.timestamp);
+      
+      let badges = '';
+      if (entry.type === 'food') {
+        badges = `<span class="risk-badge risk-${entry.risk}">${entry.risk} risk</span>`;
+        if (entry.fodmaps) {
+          const fodmapStr = renderFodmaps(entry.fodmaps);
+          if (fodmapStr) badges += `<span class="fodmaps">${fodmapStr}</span>`;
+        }
+      } else if (entry.type === 'symptom') {
+        badges = `<span class="severity-badge severity-${entry.severity}">${entry.severity}</span>`;
+      } else if (entry.type === 'note') {
+        badges = `<span class="note-badge">NOTE</span>`;
+      }
+      
+      return `
+        <div class="entry ${typeClass}">
+          <span class="time">${time}</span>
+          <div class="entry-content">
+            <div class="text">${entry.text}</div>
+            <div class="entry-details">
+              <div class="meta">${badges}</div>
+              ${entry.note ? `<div class="llm-note">${entry.note}</div>` : ''}
+            </div>
+          </div>
+          <div class="actions-col">
+            <form action="/api/duplicate" method="POST" style="display:inline">
+              <input type="hidden" name="key" value="${entry.key}">
+              <button type="submit" class="action-btn" title="Duplicate at current time">↻</button>
+            </form>
+            <form action="/api/delete" method="POST" style="display:inline">
+              <input type="hidden" name="key" value="${entry.key}">
+              <button type="submit" class="action-btn delete-btn" title="Delete">×</button>
+            </form>
+          </div>
+        </div>
+      `;
+    }
+    
+    const levelOrder = { none: 0, low: 1, medium: 2, high: 3 };
+    
+    function getWorstLevel(entries, type, field) {
+      const levels = entries
+        .filter(e => e.type === type && e[field])
+        .map(e => e[field]);
+      if (levels.length === 0) return null;
+      return levels.reduce((worst, level) => 
+        levelOrder[level] > levelOrder[worst] ? level : worst
+      );
+    }
+    
+    function renderDayRatings(entries) {
+      const worstRisk = getWorstLevel(entries, 'food', 'risk');
+      const worstSeverity = getWorstLevel(entries, 'symptom', 'severity');
+      
+      let html = '<div class="day-ratings">';
+      if (worstRisk) {
+        html += `<span class="day-rating">Food: <span class="risk-badge risk-${worstRisk}">${worstRisk}</span></span>`;
+      }
+      if (worstSeverity) {
+        html += `<span class="day-rating">Symptoms: <span class="severity-badge severity-${worstSeverity}">${worstSeverity}</span></span>`;
+      }
+      html += '</div>';
+      return (worstRisk || worstSeverity) ? html : '';
+    }
+    
+    function renderDiary() {
+      const diary = document.getElementById('diary');
+      const days = Object.keys(entriesByDay).sort().reverse();
+      
+      if (days.length === 0) {
+        diary.innerHTML = '<p>No entries yet. Add your first entry above!</p>';
+        return;
+      }
+      
+      diary.innerHTML = days.map(day => `
+        <div class="day">
+          <h2>${new Date(day + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
+          ${renderDayRatings(entriesByDay[day])}
+          ${entriesByDay[day].map(renderEntry).join('')}
+        </div>
+      `).join('');
+    }
+    
+    let chartInstance = null;
+    const fodmapTypes = ['fructans', 'gos', 'lactose', 'fructose', 'polyols'];
+    const fodmapColors = {
+      fructans: '#8b5cf6',
+      gos: '#06b6d4',
+      lactose: '#f59e0b',
+      fructose: '#ec4899',
+      polyols: '#84cc16'
+    };
+    
+    function updateChart() {
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      const container = document.getElementById('chart-container');
+      
+      if (!startDate || !endDate) {
+        container.innerHTML = '';
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        return;
+      }
+      
+      // Get days in range with their worst levels
+      const emptyDay = () => ({ symptom: 0, fructans: 0, gos: 0, lactose: 0, fructose: 0, polyols: 0 });
+      const dayData = {};
+      
+      entries.forEach(entry => {
+        const day = getLocalDate(entry.timestamp);
+        if (day >= startDate && day <= endDate) {
+          if (!dayData[day]) dayData[day] = emptyDay();
+          if (entry.type === 'food' && entry.fodmaps) {
+            fodmapTypes.forEach(f => {
+              if (entry.fodmaps[f]) {
+                dayData[day][f] = Math.max(dayData[day][f], levelOrder[entry.fodmaps[f]] || 0);
+              }
+            });
+          }
+          if (entry.type === 'symptom' && entry.severity) {
+            dayData[day].symptom = Math.max(dayData[day].symptom, levelOrder[entry.severity] || 0);
+          }
+        }
+      });
+      
+      const days = Object.keys(dayData).sort();
+      if (days.length === 0) {
+        container.innerHTML = '';
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        return;
+      }
+      
+      const labels = days.map(d => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+      
+      const datasets = [
+        {
+          label: 'Symptoms',
+          data: days.map(d => dayData[d].symptom),
+          borderColor: '#e74',
+          backgroundColor: 'rgba(238, 119, 68, 0.15)',
+          fill: true,
+          tension: 0.3,
+          borderWidth: 3
+        },
+        ...fodmapTypes.map(f => ({
+          label: f.charAt(0).toUpperCase() + f.slice(1),
+          data: days.map(d => dayData[d][f]),
+          borderColor: fodmapColors[f],
+          backgroundColor: 'transparent',
+          fill: false,
+          tension: 0.3,
+          borderWidth: 1.5,
+          borderDash: [4, 2]
+        }))
+      ];
+      
+      container.innerHTML = '<canvas id="analysisChart"></canvas>';
+      const ctx = document.getElementById('analysisChart').getContext('2d');
+      
+      if (chartInstance) chartInstance.destroy();
+      
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } }
+          },
+          scales: {
+            y: {
+              min: 0,
+              max: 3,
+              ticks: {
+                stepSize: 1,
+                callback: v => ['None', 'Low', 'Med', 'High'][v]
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    async function analyzeEntries() {
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      const resultDiv = document.getElementById('analysis-result');
+      
+      if (!startDate || !endDate) {
+        resultDiv.textContent = 'Please select both start and end dates.';
+        return;
+      }
+      
+      // Filter entries by local date
+      const filteredEntries = entries.filter(entry => {
+        const localDate = getLocalDate(entry.timestamp);
+        return localDate >= startDate && localDate <= endDate;
+      });
+      
+      resultDiv.textContent = 'Analyzing...';
+      
+      try {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entries: filteredEntries })
+        });
+        
+        const result = await response.json();
+        
+        if (result.error) {
+          resultDiv.textContent = result.error;
+          return;
+        }
+        
+        let html = `<strong>Summary:</strong> ${result.summary}\n\n`;
+        
+        if (result.correlations?.length) {
+          html += '<strong>Correlations Found:</strong>\n';
+          result.correlations.forEach(c => {
+            html += `• ${c.food} → ${c.symptom} (${c.confidence} confidence)\n  ${c.explanation}\n`;
+          });
+          html += '\n';
+        }
+        
+        if (result.trigger_foods?.length) {
+          html += `<strong>Possible Trigger Foods:</strong> ${result.trigger_foods.join(', ')}\n\n`;
+        }
+        
+        if (result.safe_foods?.length) {
+          html += `<strong>Well-Tolerated Foods:</strong> ${result.safe_foods.join(', ')}\n\n`;
+        }
+        
+        if (result.recommendations?.length) {
+          html += '<strong>Recommendations:</strong>\n';
+          result.recommendations.forEach(r => {
+            html += `• ${r}\n`;
+          });
+        }
+        
+        resultDiv.innerHTML = html;
+      } catch (error) {
+        resultDiv.textContent = 'Error: ' + error.message;
+      }
+    }
+    
+    // Set default date range to last 2 weeks
+    const today = new Date().toISOString().split('T')[0];
+    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    document.getElementById('startDate').value = twoWeeksAgo;
+    document.getElementById('endDate').value = today;
+    
+    renderDiary();
+    updateChart();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,16 @@
+{
+  "name": "fodmap-diary",
+  "version": "1.0.0",
+  "description": "A low-FODMAP food diary powered by LLMs",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "level": "^8.0.1"
+  }
+}
+
