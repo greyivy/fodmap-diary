@@ -98,18 +98,18 @@ export async function classify(text) {
       role: 'system',
       content: `You are a FODMAP diet expert. Analyze the user's input and classify it as either a food entry or a symptom entry. If a food entry, take portion size into account, assuming a medium portion size if not specified.
 
-Use browser_search to:
+You have access to browser_search which you may optionally use to:
 - Visit recipe URLs the user provides
 - Look up FODMAP info for unfamiliar foods or ingredients you're unsure about (prioritizing the Monash University as a source)
 
-After your analysis, respond with ONLY a JSON object in your message (not as a tool call). Do not wrap it in markdown code blocks.
+CRITICAL: Your final response must be plain text containing a JSON object. Do NOT use any tool to return JSON - just write the JSON directly as text. No markdown code blocks.
 
-For FOOD entries:
+For FOOD entries, respond with:
 {"type":"food","factors":{${FACTORS_SCHEMA}},"note":"Brief note about content or portion guidance"}
 
 Use "unknown" for a category if you cannot determine the level with reasonable confidence.
 
-For SYMPTOM entries:
+For SYMPTOM entries, respond with:
 {"type":"symptom","severity":"low|medium|high","note":"Brief note about the symptom"}
 
 Be accurate about FODMAP levels based on Monash University guidelines.`
