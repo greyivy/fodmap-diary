@@ -145,6 +145,22 @@ app.post('/api/delete', async (req, res) => {
   }
 });
 
+// Delete multiple entries (for deleting a whole day)
+app.post('/api/delete-day', async (req, res) => {
+  const { keys } = req.body;
+  
+  try {
+    const keyList = keys.split(',');
+    for (const key of keyList) {
+      await db.del(key);
+    }
+    res.redirect('/');
+  } catch (error) {
+    console.error('Error deleting day:', error);
+    res.status(500).send(`Error: ${error.message}. <a href="/">Go back</a>`);
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`FODMAP Diary running at http://localhost:${PORT}`);

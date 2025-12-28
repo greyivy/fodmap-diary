@@ -10,7 +10,8 @@
     #textInput { width: 100%; height: 60px; margin-bottom: 10px; font-family: inherit; font-size: inherit; box-sizing: border-box; }
     button { padding: 8px 16px; font-size: 14px; cursor: pointer; }
     .day { margin-bottom: 30px; }
-    .day h2 { border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 5px; }
+    .day-header { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 5px; }
+    .day-header h2 { margin: 0; flex: 1; }
     .day-ratings { font-size: 14px; margin-bottom: 15px; }
     .day-rating { margin-right: 15px; }
     .entry { margin: 12px 0; display: grid; grid-template-columns: 70px 1fr auto; gap: 0 10px; }
@@ -475,13 +476,22 @@
         return;
       }
       
-      diary.innerHTML = days.map(day => `
+      diary.innerHTML = days.map(day => {
+        const dayKeys = entriesByDay[day].map(e => e.key).join(',');
+        const dateLabel = new Date(day + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        return `
         <div class="day" id="day-${day}">
-          <h2>${new Date(day + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
+          <div class="day-header">
+            <h2>${dateLabel}</h2>
+            <form action="/api/delete-day" method="POST" style="display:inline" onsubmit="return confirm('Delete all ${entriesByDay[day].length} entries for ${dateLabel}?')">
+              <input type="hidden" name="keys" value="${dayKeys}">
+              <button type="submit" class="tag-btn delete-btn" title="Delete day">✗</button>
+            </form>
+          </div>
           ${renderDayRatings(entriesByDay[day])}
           ${entriesByDay[day].map(renderEntry).join('')}
         </div>
-      `).join('');
+      `}).join('');
     }
     
     // Derive types from central config
