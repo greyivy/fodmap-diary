@@ -96,7 +96,7 @@ export async function classify(text) {
   const messages = [
     {
       role: 'system',
-      content: `You are a FODMAP diet expert. Analyze the user's input and classify it as either a food entry or a symptom entry. If a food entry, take portion size into account, assuming a medium portion size if not specified.
+      content: `You are a FODMAP diet expert. Analyze the user's input and classify it as either a food entry or a symptom entry. If a food entry, take portion size into account, assuming a medium portion size if not specified. All entered food is vegan (no honey).
 
 You have access to browser_search which you may optionally use to:
 - Visit recipe URLs the user provides
